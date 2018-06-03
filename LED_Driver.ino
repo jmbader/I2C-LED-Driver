@@ -11,7 +11,7 @@ void back_and_forth(uint8_t);
 void moving_rainbow();
 
 // How many leds in your strip?
-#define NUM_LEDS 18
+#define NUM_LEDS 60
 
 // For led chips like Neopixels, which have a data line, ground, and power, you just
 // need to define DATA_PIN.  For led chipsets that are SPI based (four wires - data, clock,
@@ -24,13 +24,14 @@ CRGB leds[NUM_LEDS];
 //stores data from i2c coms
 uint8_t data[3] = { 0x00, 0x00, 0x00 };
 
+uint8_t led_pin_board = 13;
 
 /**
  * sets up arduino as an i2c slave
  */
 void i2cSetup() {
-	Wire.begin(8);// join i2c bus with address #8
-	Wire.onReceive(receiveEvent);// register event
+	Wire.begin(8); // join i2c bus with address #8
+	Wire.onReceive(receiveEvent); // register event
 	Serial.println("i2c has been setup");
 }
 
@@ -39,10 +40,16 @@ void i2cSetup() {
  * @param howMany bytes in i2c data
  */
 void receiveEvent(int howMany) {
-	while (0 < Wire.available()) {
-		uint8_t curr_byte = Wire.read(); // receive byte
-		data[Wire.available()] = curr_byte; //puts byte in array
+	while (2 < Wire.available()) {
+		Wire.read();
 	}
+	while (0 < Wire.available()) {
+		digitalWrite(led_pin_board, HIGH);
+		uint8_t curr_reg = Wire.read(); // receive byte
+		uint8_t curr_data = Wire.read(); // receive byte
+		write_register(curr_reg, curr_data);
+	}
+	digitalWrite(led_pin_board, LOW);
 }
 
 void setup() {
@@ -54,49 +61,47 @@ void setup() {
 	// FastLED.addLeds<TM1809, DATA_PIN, RGB>(leds, NUM_LEDS);
 	// FastLED.addLeds<WS2811, DATA_PIN, RGB>(leds, NUM_LEDS);
 	// FastLED.addLeds<WS2812, DATA_PIN, RGB>(leds, NUM_LEDS);
-	// FastLED.addLeds<WS2812B, DATA_PIN, RGB>(leds, NUM_LEDS);
-	FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
+	FastLED.addLeds<WS2812B, DATA_PIN, RGB>(leds, NUM_LEDS);
+	//FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
 	// FastLED.addLeds<APA104, DATA_PIN, RGB>(leds, NUM_LEDS);
 	// FastLED.addLeds<UCS1903, DATA_PIN, RGB>(leds, NUM_LEDS);
 	// FastLED.addLeds<UCS1903B, DATA_PIN, RGB>(leds, NUM_LEDS);
 	// FastLED.addLeds<GW6205, DATA_PIN, RGB>(leds, NUM_LEDS);
 	// FastLED.addLeds<GW6205_400, DATA_PIN, RGB>(leds, NUM_LEDS);
+	pinMode(led_pin_board, OUTPUT);
+	digitalWrite(led_pin_board, LOW);
 
 	i2cSetup();
 	Serial.println("setup() done");
 }
 
-uint8_t red = 255;
-uint8_t green = 0;
-uint8_t blue = 0;
-
 void loop() {
-	/*
-	if (!(data[0] || data[1] || data[2])) {
-		moving_rainbow();
-	} else {
-		setAll(data[2], data[1], data[0]);
-		FastLED.show();
-		delay(20);
+	uint8_t mode = read_register(0x02);
+	switch (mode) {
+	case 0x00: {
+		//all off
+		clearLEDs();
+		break;
 	}
-	*/
-
-	//tests
-	print_data_register();
-	delay(500);
-
-	write_register(8, 0xFF);
-	print_data_register();
-
-	write_register(7, 0x0F);
-	write_register(0, 0x0F);
-	print_data_register();
-
-	read_register(8);
-	read_register(7);
-	read_register(0);
-
-	delay(100000);
+	case 0x01: {
+		//solid color
+		uint8_t red = read_register(0x04);
+		uint8_t green = read_register(0x05);
+		uint8_t blue = read_register(0x06);
+		setAll(red, green, blue);
+		break;
+	}
+	case 0x02: {
+		//nightrider
+		break;
+	}
+	case 0x03: {
+		//rainbow
+		break;
+	}
+	}
+	FastLED.setBrightness(20);
+	FastLED.show();
 }
 
 /**
@@ -108,7 +113,6 @@ void loop() {
 void setAll(uint8_t t_red, uint8_t t_green, uint8_t t_blue) {
 	for (int curr_led = 0; curr_led < NUM_LEDS; curr_led++) {
 		leds[curr_led] = CRGB(t_red, t_green, t_blue);
-		leds[curr_led].nscale8_video(20);
 	}
 	FastLED.show();
 }
@@ -124,10 +128,9 @@ void clearLEDs() {
 }
 
 void back_and_forth(uint8_t t_speed) {
+	uint8_t red = 0, green = 0, blue = 0;
 	for (int curr_led = 0; curr_led < NUM_LEDS; curr_led++) {
-
 		leds[curr_led] = CRGB(red, green, blue);
-		leds[curr_led].nscale8_video(50);
 
 		if (curr_led > 0) {
 			leds[curr_led - 1] = CRGB::Black;
@@ -140,9 +143,7 @@ void back_and_forth(uint8_t t_speed) {
 	}
 
 	for (int curr_led = NUM_LEDS - 1; curr_led >= 0; curr_led--) {
-
 		leds[curr_led] = CRGB(red, green, blue);
-		leds[curr_led].nscale8_video(50);
 
 		if (curr_led < NUM_LEDS - 1) {
 			leds[curr_led + 1] = CRGB::Black;
@@ -160,7 +161,6 @@ void moving_rainbow() {
 		uint8_t hue = 0;
 		while (hue < 213) {
 			fill_gradient(leds, 0, CHSV(hue, 255, 255), NUM_LEDS, CHSV(213 - hue, 255, 255), BACKWARD_HUES);
-			FastLED.setBrightness(20);
 			FastLED.show();
 			delay(20);
 			hue++;

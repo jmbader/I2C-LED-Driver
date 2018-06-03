@@ -7,7 +7,7 @@
 #include "Arduino.h"
 #include "Register.h"
 
-#define DEBUG 1
+#define DEBUG 0
 
 uint8_t data_register[8];
 
