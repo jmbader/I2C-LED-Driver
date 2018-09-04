@@ -9,7 +9,7 @@
 
 #define DEBUG 0
 
-uint8_t data_register[8];
+uint8_t data_register[register_size];
 
 /**
  * writes data to the address
