@@ -21,7 +21,7 @@ uint8_t write_register(uint8_t t_address, uint8_t t_value) {
 	//check if address was in range
 	if (t_address >= register_size) {
 		if (DEBUG)
-			Serial.println("Given register out of bound");
+			Serial.println(F("Given register out of bound"));
 		return 0;
 	} else {
 		//register address valid
@@ -45,7 +45,7 @@ uint8_t read_register(uint8_t t_address) {
 	//check if address was in range
 	if (t_address >= register_size) {
 		if (DEBUG)
-			Serial.println("Given register out of bound");
+			Serial.println(F("Given register out of bound"));
 	} else {
 		//register address valid
 		value = data_register[t_address];
@@ -64,13 +64,13 @@ uint8_t read_register(uint8_t t_address) {
  * Prints all of the values in the data_register
  */
 void print_data_register() {
-	Serial.println("\ndata_register print:");
+	Serial.println(F("\ndata_register print:"));
 	for (uint8_t curr_addr = 0; curr_addr < register_size; curr_addr++) {
 		char buff[24];
 		uint8_t value = data_register[curr_addr];
 		sprintf(buff, "REG: %X\t DATA: %X", curr_addr, value);
 		Serial.println(buff);
 	}
-	Serial.print("\n");//add a new line at the end
+	Serial.print(F("\n"));//add a new line at the end
 }
 
