@@ -102,6 +102,12 @@ void loop() {
           uint8_t hue = read_register(0x04);
           uint8_t sat = read_register(0x05);
           uint8_t val = read_register(0x06);
+//          Serial.print("hue: ");
+//          Serial.print(hue);
+//          Serial.print(" sat: ");
+//          Serial.print(sat);
+//          Serial.print(" val: ");
+//          Serial.println(val);
           setAllHSV(hue, sat, val);
         } else {
           //solid color rgb

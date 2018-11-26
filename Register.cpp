@@ -7,7 +7,7 @@
 #include "Arduino.h"
 #include "Register.h"
 
-#define DEBUG 0
+#define DEBUG true
 
 uint8_t data_register[register_size];
 
@@ -53,7 +53,7 @@ uint8_t read_register(uint8_t t_address) {
 		if (DEBUG) {
 			char buff[40];
 			sprintf(buff, "REG: %X\t has DATA: %X", value, t_address);
-			Serial.println(buff);
+			//Serial.println(buff);
 		}
 
 	}
