@@ -1,7 +1,9 @@
 #include <Arduino.h>
-#include "FastLED.h"
-#include "Wire.h"
+#include <FastLED.h>
+#include <Wire.h>
 #include "Register.h"
+
+#define DEBUG 0
 
 //function definitions
 void clearLEDs();
@@ -11,24 +13,24 @@ void back_and_forth(uint8_t);
 void moving_rainbow();
 
 // the max number of leds we support
-#define MAX_LEDS 500
+//128 LEDs for pro mini ATmega168 5V 16MHz
+#define MAX_LEDS 128
 
 // How many leds in your strip?
-// #define NUM_LEDS 60
-uint16_t NUM_LEDS = MAX_LEDS;
+uint16_t NUM_LEDS = 60;
 
 // For led chips like Neopixels, which have a data line, ground, and power, you just
 // need to define DATA_PIN.  For led chipsets that are SPI based (four wires - data, clock,
 // ground, and power), like the LPD8806 define both DATA_PIN and CLOCK_PIN
-#define DATA_PIN PIN_D2
+#define DATA_PIN 2
 
 // Define the array of leds
 CRGB leds[MAX_LEDS];
 
-//stores data from i2c coms
-uint8_t data[3] = { 0x00, 0x00, 0x00 };
+byte led_pin_board = 13;//onboard led so you can see I2C comms
 
-uint8_t led_pin_board = 13;
+byte i2c_disable_pin = 9;
+
 
 /**
    sets up arduino as an i2c slave
@@ -37,7 +39,7 @@ void i2cSetup() {
   Wire.setClock(400000);
   Wire.begin(8); // join i2c bus with address #8
   Wire.onReceive(receiveEvent); // register event
-  Serial.println("i2c has been setup");
+  Serial.println(F("i2c has been setup"));
 }
 
 /**
@@ -69,8 +71,8 @@ void setup() {
   // FastLED.addLeds<TM1809, DATA_PIN, RGB>(leds, NUM_LEDS);
   // FastLED.addLeds<WS2811, DATA_PIN, RGB>(leds, NUM_LEDS);
   // FastLED.addLeds<WS2812, DATA_PIN, RGB>(leds, NUM_LEDS);
-  FastLED.addLeds<WS2812B, DATA_PIN, RGB>(leds, NUM_LEDS);
-  //FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
+  //FastLED.addLeds<WS2812B, DATA_PIN, RGB>(leds, NUM_LEDS);
+  FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
   // FastLED.addLeds<APA104, DATA_PIN, RGB>(leds, NUM_LEDS);
   // FastLED.addLeds<UCS1903, DATA_PIN, RGB>(leds, NUM_LEDS);
   // FastLED.addLeds<UCS1903B, DATA_PIN, RGB>(leds, NUM_LEDS);
@@ -79,25 +81,43 @@ void setup() {
   pinMode(led_pin_board, OUTPUT);
   digitalWrite(led_pin_board, LOW);
 
-  i2cSetup();
+  pinMode(i2c_disable_pin, INPUT_PULLUP); // default high
+  //if pin is high i2c is enable
+  //if pin is low no i2c, go to predefined mode
+  boolean i2c_enabled = digitalRead(i2c_disable_pin);
+
+  if(i2c_enabled){
+    Serial.println("I2C Enabled");
+    //i2cSetup();
+  }else{
+    Serial.println("I2C Disabled");
+    write_register(REGISTER_MODE, 0x01);
+    write_register(REGISTER_COLOR_MODE, 0x00);//RGB mode
+    write_register(REGISTER_DATA_0, 0xFF);//red at 255
+    write_register(REGISTER_BRIGHTNESS, 0x0F);//set brgihtness
+  }
   Serial.println("setup() done");
 }
 
 boolean interrupt = false;
+enum Modes{all_off, all_one_color, knight_rider, knight_rider_rainbow, rainbow};
 
 void loop() {
+  if(DEBUG){
+      Serial.println(F("alive"));
+  }
+  
   interrupt = false;
-  //Serial.println("alive");
-  uint8_t mode = read_register(REGISTER_MODE);
+  enum Modes mode = read_register(REGISTER_MODE);
   uint8_t colorMode = read_register(REGISTER_COLOR_MODE);
 
   switch (mode) {
-    case 0x00: {
+    case all_off: {
         //all off
         clearLEDs();
         break;
       }
-    case 0x01: {
+    case all_one_color: {
         if (colorMode == 0x01) {
           uint8_t hue = read_register(0x04);
           uint8_t sat = read_register(0x05);
@@ -118,7 +138,7 @@ void loop() {
         }
         break;
       }
-    case 0x02: {
+    case knight_rider: {
         uint8_t wait = read_register(REGISTER_DATA_3);
         CRGB color;
         if (colorMode == 0x01) {
@@ -134,14 +154,14 @@ void loop() {
           color = CRGB(red, green, blue);
         }
         knightRider(color, wait, 4);
-          break;
+        break;
       }
-    case 0x03: {
+    case knight_rider_rainbow: {
         uint8_t wait = read_register(REGISTER_DATA_3);
         knightRiderRainbow(wait, 4);
         break;
       }
-    case 0x04: {
+    case rainbow: {
         uint8_t wait = read_register(REGISTER_DATA_3);
         fullRainbow(wait);
         break;
@@ -298,13 +318,13 @@ void knightRider(CRGB color, int wait, int num) {
 }
 
 void knightRiderRainbow(int wait, int num) {
-  for(int startHue = 255; startHue > 0; startHue--) {
+  for (int startHue = 255; startHue > 0; startHue--) {
     for (int i = 0; i <= NUM_LEDS - num; i++) {
       FastLED.clear();
       for (int j = 0; j < num; j++) {
-        int hue = startHue + float(i+j) / float(NUM_LEDS) * 255;
-        while(hue > 255) {
-          hue-=256;
+        int hue = startHue + float(i + j) / float(NUM_LEDS) * 255;
+        while (hue > 255) {
+          hue -= 256;
         }
         leds[i + j] = CHSV(hue, 255, 255);
       }
@@ -319,8 +339,8 @@ void knightRiderRainbow(int wait, int num) {
       FastLED.clear();
       for (int j = 0; j < num; j++) {
         int hue = startHue + float(i - j) / float(NUM_LEDS) * 255;
-        while(hue > 255) {
-          hue-=256;
+        while (hue > 255) {
+          hue -= 256;
         }
         leds[i - j] = CHSV(hue, 255, 255);
       }
