@@ -14,10 +14,10 @@ void moving_rainbow();
 
 // the max number of leds we support
 //128 LEDs for pro mini ATmega168 5V 16MHz
-#define MAX_LEDS 128
+#define MAX_LEDS 300
 
 // How many leds in your strip?
-uint16_t NUM_LEDS = 60;
+uint16_t NUM_LEDS = 300;
 
 // For led chips like Neopixels, which have a data line, ground, and power, you just
 // need to define DATA_PIN.  For led chipsets that are SPI based (four wires - data, clock,
@@ -36,7 +36,7 @@ byte i2c_disable_pin = 9;
    sets up arduino as an i2c slave
 */
 void i2cSetup() {
-  Wire.setClock(400000);
+  Wire.setClock(100000);
   Wire.begin(8); // join i2c bus with address #8
   Wire.onReceive(receiveEvent); // register event
   Serial.println(F("i2c has been setup"));
@@ -88,7 +88,7 @@ void setup() {
 
   if(i2c_enabled){
     Serial.println("I2C Enabled");
-    //i2cSetup();
+    i2cSetup();
   }else{
     Serial.println("I2C Disabled");
     write_register(REGISTER_MODE, 0x01);
@@ -100,7 +100,7 @@ void setup() {
 }
 
 boolean interrupt = false;
-enum Modes{all_off, all_one_color, knight_rider, knight_rider_rainbow, rainbow};
+enum Modes{all_off, all_one_color, knight_rider, knight_rider_rainbow, rainbow, candycane};
 
 void loop() {
   if(DEBUG){
@@ -108,8 +108,15 @@ void loop() {
   }
   
   interrupt = false;
-  enum Modes mode = read_register(REGISTER_MODE);
+  enum Modes mode = (Modes) read_register(REGISTER_MODE);
   uint8_t colorMode = read_register(REGISTER_COLOR_MODE);
+
+  uint8_t brightness = read_register(REGISTER_BRIGHTNESS);
+  FastLED.setBrightness(brightness);
+
+  uint8_t ledCount0 = read_register(REGISTER_LED_COUNT_0);
+  uint8_t ledCount1 = read_register(REGISTER_LED_COUNT_1);
+  NUM_LEDS = ledCount0 + ledCount1 * 256;
 
   switch (mode) {
     case all_off: {
@@ -122,12 +129,6 @@ void loop() {
           uint8_t hue = read_register(0x04);
           uint8_t sat = read_register(0x05);
           uint8_t val = read_register(0x06);
-//          Serial.print("hue: ");
-//          Serial.print(hue);
-//          Serial.print(" sat: ");
-//          Serial.print(sat);
-//          Serial.print(" val: ");
-//          Serial.println(val);
           setAllHSV(hue, sat, val);
         } else {
           //solid color rgb
@@ -166,14 +167,13 @@ void loop() {
         fullRainbow(wait);
         break;
       }
+    case candycane: {
+      uint8_t width = read_register(REGISTER_DATA_0);
+      uint8_t wait = read_register(REGISTER_DATA_3);
+      candyCane(wait, width);
+      break;
+    }
   }
-
-  uint8_t brightness = read_register(REGISTER_BRIGHTNESS);
-  FastLED.setBrightness(brightness);
-
-  uint8_t ledCount0 = read_register(REGISTER_LED_COUNT_0);
-  uint8_t ledCount1 = read_register(REGISTER_LED_COUNT_1);
-  NUM_LEDS = ledCount0 + ledCount1 * 256;
 
   FastLED.show();
 }
@@ -351,6 +351,26 @@ void knightRiderRainbow(int wait, int num) {
       }
       delay(wait);
     }
+  }
+}
+
+void candyCane(int wait, int segmentSize) {
+  for (int i = -segmentSize*2 + 1; i < 0; i++) {
+      for (int j = 0; j < NUM_LEDS; j++) {
+        //Serial.println(j);
+        if (interrupt) {
+          return;
+        }
+        if((j+segmentSize*2+i) % (segmentSize*2) >= segmentSize) {
+          //Serial.println("red");
+          if(j < NUM_LEDS) leds[j] = CRGB::Red;
+        } else {
+          //Serial.println("white");
+          if(j < NUM_LEDS) leds[j] = CRGB::White;
+        }
+      }
+      FastLED.show();
+      delay(wait);
   }
 }
 
