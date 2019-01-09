@@ -17,7 +17,7 @@ void moving_rainbow();
 #define MAX_LEDS 300
 
 // How many leds in your strip?
-uint16_t NUM_LEDS = 300;
+uint16_t NUM_LEDS = 30;
 
 // For led chips like Neopixels, which have a data line, ground, and power, you just
 // need to define DATA_PIN.  For led chipsets that are SPI based (four wires - data, clock,
@@ -95,6 +95,8 @@ void setup() {
     write_register(REGISTER_COLOR_MODE, 0x00);//RGB mode
     write_register(REGISTER_DATA_0, 0xFF);//red at 255
     write_register(REGISTER_BRIGHTNESS, 0x0F);//set brgihtness
+    write_register(REGISTER_LED_COUNT_0, NUM_LEDS % 256);
+    write_register(REGISTER_LED_COUNT_1, NUM_LEDS / 256);
   }
   Serial.println("setup() done");
 }
