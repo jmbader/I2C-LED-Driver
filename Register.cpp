@@ -6,6 +6,7 @@
  */
 #include "Arduino.h"
 #include "Register.h"
+#include "EEPROM.h"
 
 #define DEBUG true
 
@@ -31,6 +32,9 @@ uint8_t write_register(uint8_t t_address, uint8_t t_value) {
 			sprintf(buff, "DATA: %X, written to REG: %X", t_value, t_address);
 			Serial.println(buff);
 		}
+    EEPROM.update(t_address, t_value); // only updates if value changed
+    // should never exceed the size of any board's EEPROM
+    // since t_address is capped at register_size (max 255)
 		return t_value;
 	}
 }

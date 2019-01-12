@@ -2,6 +2,7 @@
 #include <FastLED.h>
 #include <Wire.h>
 #include "Register.h"
+#include "EEPROM.h"
 
 #define DEBUG 0
 
@@ -29,14 +30,14 @@ CRGB leds[MAX_LEDS];
 
 byte led_pin_board = 13;//onboard led so you can see I2C comms
 
-byte i2c_disable_pin = 9;
+byte eeprom_load_disable_pin = 9;
 
 
 /**
    sets up arduino as an i2c slave
 */
 void i2cSetup() {
-  Wire.setClock(100000);
+  Wire.setClock(400000); //has to be clock speed of the RoboRIO, apparently
   Wire.begin(8); // join i2c bus with address #8
   Wire.onReceive(receiveEvent); // register event
   Serial.println(F("i2c has been setup"));
@@ -80,24 +81,24 @@ void setup() {
   // FastLED.addLeds<GW6205_400, DATA_PIN, RGB>(leds, NUM_LEDS);
   pinMode(led_pin_board, OUTPUT);
   digitalWrite(led_pin_board, LOW);
+  
+  i2cSetup();
 
-  pinMode(i2c_disable_pin, INPUT_PULLUP); // default high
+  pinMode(eeprom_load_disable_pin, INPUT_PULLUP); // default high
   //if pin is high i2c is enable
   //if pin is low no i2c, go to predefined mode
-  boolean i2c_enabled = digitalRead(i2c_disable_pin);
+  boolean eeprom_load_enabled = digitalRead(eeprom_load_disable_pin);
 
-  if(i2c_enabled){
-    Serial.println("I2C Enabled");
-    i2cSetup();
+  if(eeprom_load_enabled){
+    Serial.println("EEPROM Load Enabled");
+    for( int addr = 0; addr < register_size; addr++) {
+      write_register(addr, EEPROM.read(addr));
+    }
+    Serial.println("Loaded from EEPROM");
   }else{
-    Serial.println("I2C Disabled");
-    write_register(REGISTER_MODE, 0x01);
-    write_register(REGISTER_COLOR_MODE, 0x00);//RGB mode
-    write_register(REGISTER_DATA_0, 0xFF);//red at 255
-    write_register(REGISTER_BRIGHTNESS, 0x0F);//set brgihtness
-    write_register(REGISTER_LED_COUNT_0, NUM_LEDS % 256);
-    write_register(REGISTER_LED_COUNT_1, NUM_LEDS / 256);
+    Serial.println("EEPROM Load Disabled");
   }
+  
   Serial.println("setup() done");
 }
 
